@@ -1,64 +1,84 @@
 # Latarm Transform AI
 
-Educational project: transform transaction text between Latarm / Armenian / English / Russian using a local AI model (Ollama), not hardcoded if/else dictionaries.
+Educational project: transform SMS text between Latarm / Armenian / English / Russian using local AI (Ollama) grounded on Excel glossary templates (RAG).
+
+## Idea
+
+You do **not** hardcode translation rules.
+Flow is always AI:
+
+1. Load templates from `data/SMS_Templates.xlsx` (sheet `New`)
+2. On `/transform`, retrieve top similar templates (embeddings + lexical)
+3. Send input + candidates to Llama
+4. Return `arm` / `eng` / `rus` (+ `latarm`)
+
+Updating templates = put new Excel + call `/admin/reindex` (no model fine-tune yet).
 
 ## Stack
 
-- Python 3.12
-- FastAPI (API)
-- Ollama + `llama3.2` (local model)
-- Docker (later, for vector DB / compose)
-
-## Project layout
-
-```text
-latarm-transform/
-  app/
-    main.py            # FastAPI entrypoint
-    schemas.py         # request/response models
-    ollama_client.py   # calls local Ollama
-  data/                # Excel glossary will go here later
-  requirements.txt
-```
+- Python 3.12 + FastAPI
+- Ollama chat model: `llama3.2`
+- Ollama embedding model: `nomic-embed-text`
+- Excel glossary: `data/SMS_Templates.xlsx`
 
 ## Setup
-
-1. Create venv and install deps:
 
 ```powershell
 cd D:\Step\Programs\AI\latarm-transform
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+
+ollama pull llama3.2
+ollama pull nomic-embed-text
 ```
 
-2. Make sure Ollama is running and model exists:
+Put glossary file here:
 
-```powershell
-ollama list
-```
+`data/SMS_Templates.xlsx`
 
-3. Start API:
+## Run
 
 ```powershell
 uvicorn app.main:app --reload --port 8001
 ```
 
-4. Open docs: http://localhost:8001/docs
+Docs: http://localhost:8001/docs
 
-## Example request
+## API
 
-```http
-POST /transform
+- `GET /health`
+- `GET /admin/glossary/status`
+- `POST /admin/reindex` — reload Excel and rebuild embeddings
+- `POST /transform`
+
+Example:
+
+```json
 {
-  "text": "kanxikacum",
+  "text": "Anbavarar mijocner <amount> <currency> <card_mask>",
   "source": "latarm"
 }
 ```
 
-## Next steps
+## Update templates
 
-1. Load Excel glossary into `data/`
-2. Add exact/fuzzy match before LLM
-3. Add embeddings / RAG
-4. Push to GitHub under `maratuktours-com`
+1. Replace `data/SMS_Templates.xlsx`
+2. `POST /admin/reindex`
+3. New `/transform` calls use updated knowledge
+
+## Project layout
+
+```text
+app/
+  main.py              # API + startup reindex
+  ollama_client.py     # Llama chat with glossary-aware prompt
+  schemas.py
+  config.py
+  glossary/
+    loader.py          # Excel -> templates
+    store.py           # embeddings retrieval + lexical fallback
+    models.py
+data/
+  SMS_Templates.xlsx
+```
