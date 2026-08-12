@@ -13,6 +13,7 @@ from app.schemas import (
     TransformRequest,
     TransformResponse,
 )
+from app.source_detector import detect_source
 
 store = GlossaryStore()
 ollama = OllamaClient()
@@ -71,9 +72,10 @@ async def transform(request: TransformRequest) -> TransformResponse:
         )
 
     retrieved = await store.retrieve(request.text, top_k=RETRIEVE_TOP_K)
+    source = detect_source(request.text, retrieved=retrieved)
 
     try:
-        result = await ollama.transform(request.text, request.source, retrieved=retrieved)
+        result = await ollama.transform(request.text, source, retrieved=retrieved)
     except Exception as exc:  # noqa: BLE001 - educational endpoint, surface model/network errors
         raise HTTPException(status_code=502, detail=f"Ollama call failed: {exc}") from exc
 
@@ -93,7 +95,7 @@ async def transform(request: TransformRequest) -> TransformResponse:
         rus=str(result.get("rus", "")).strip(),
         latarm=(str(result.get("latarm", "")).strip() or None),
         matched_subject=(str(result.get("matched_subject", "")).strip() or None),
-        source_detected=request.source.value,
+        source_detected=source.value,
         model=str(result.get("_model", ollama.model)),
         retrieval_method=retrieved[0].method if retrieved else None,
         candidates=candidates,
