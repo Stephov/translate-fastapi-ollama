@@ -57,11 +57,14 @@ Example:
 
 ```json
 {
-  "text": "Anbavarar mijocner <amount> <currency> <card_mask>"
+  "text": "Qarti hamalrum <amount> <currency> <card_mask> <sw_date> <sw_time>, TRN NU <utrnno>, Mnacord: <acct_bal> <acct_curr>"
 }
 ```
 
-`source` is detected automatically (`latarm` or `eng`) and returned as `source_detected`.
+Rules:
+- Placeholders / noise (`<amount>`, `TRN NU`, numbers, dates, currencies) are not transformed.
+- If not all template keywords are present in input → `transform_ok=false`, subject=`Amio card`, all language fields = original text.
+- `source` is detected automatically and returned as `source_detected`.
 
 ## Update templates
 

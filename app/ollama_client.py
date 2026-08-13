@@ -9,7 +9,7 @@ from app.schemas import SourceFormat
 
 
 SYSTEM_PROMPT = """You are a banking SMS template transformation engine.
-You MUST transform the input using the provided glossary templates.
+You MUST transform the input using the provided glossary template.
 
 Return ONLY valid JSON with this schema:
 {
@@ -17,17 +17,18 @@ Return ONLY valid JSON with this schema:
   "arm": "Armenian script",
   "eng": "English",
   "rus": "Russian",
-  "matched_subject": "subject from the best matching template"
+  "matched_subject": "subject from the chosen template"
 }
 
 Hard rules:
-- Choose the glossary candidate whose LATARM/ENG opening phrase best matches the input meaning.
-- Do not invent a new business meaning.
-- Preserve placeholders exactly as in templates: <amount>, <currency>, <card_mask>, <sw_date>, <sw_time>, <utrnno>, <acct_bal>, <acct_curr>, <addr_name>, etc.
-- If input contains concrete values instead of placeholders, keep those values in the same positions.
-- If input is Latarm, fill arm/eng/rus (and latarm normalized from glossary when possible).
-- If input is Eng, fill arm/rus (and eng normalized), plus latarm from glossary.
-- matched_subject must come from the chosen candidate.
+- Transform ONLY meaningful template words (example: Qarti, hamalrum, Mnacord).
+- Do NOT translate/change placeholders: <amount>, <currency>, <card_mask>, <sw_date>, <sw_time>, <utrnno>, <acct_bal>, <acct_curr>, <addr_name>, etc.
+- Do NOT translate/change noise tokens such as TRN NU, punctuation, numbers, dates, times, currency codes, masks, and similar technical values.
+- Keep frozen tokens exactly as in the input, in the same positions.
+- Use the provided validated template as the meaning source.
+- If input is Latarm, fill arm/eng/rus (and normalized latarm from glossary wording when possible).
+- If input is Eng, fill arm/rus/latarm (and normalized eng from glossary wording when possible).
+- matched_subject must come from the chosen template.
 - Return JSON only, no markdown.
 """
 
@@ -41,40 +42,35 @@ class OllamaClient:
         self,
         text: str,
         source: SourceFormat,
-        retrieved: list[RetrievedTemplate],
+        validated: RetrievedTemplate,
+        keywords: list[str],
     ) -> str:
-        if retrieved:
-            blocks = []
-            for idx, item in enumerate(retrieved, start=1):
-                blocks.append(
-                    f"[candidate {idx} | score={item.score:.4f} | method={item.method}]\n"
-                    f"{item.template.to_prompt_block()}"
-                )
-            glossary_block = "\n\n".join(blocks)
-        else:
-            glossary_block = "No glossary candidates available."
-
         return (
             f"source_format: {source.value}\n"
-            f"input_text: {text}\n\n"
-            f"Glossary candidates:\n{glossary_block}\n\n"
-            "Transform the input into latarm/arm/eng/rus using the best candidate."
+            f"input_text: {text}\n"
+            f"transformable_keywords: {', '.join(keywords)}\n\n"
+            f"Validated glossary template:\n{validated.template.to_prompt_block()}\n\n"
+            "Transform only transformable_keywords / their language equivalents. "
+            "Keep all placeholders, TRN NU, punctuation, numbers, dates and technical values unchanged."
         )
 
     async def transform(
         self,
         text: str,
         source: SourceFormat,
-        retrieved: list[RetrievedTemplate] | None = None,
+        validated: RetrievedTemplate,
+        keywords: list[str],
     ) -> dict:
-        retrieved = retrieved or []
         payload = {
             "model": self.model,
             "stream": False,
             "format": "json",
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": self._build_user_prompt(text, source, retrieved)},
+                {
+                    "role": "user",
+                    "content": self._build_user_prompt(text, source, validated, keywords),
+                },
             ],
         }
 

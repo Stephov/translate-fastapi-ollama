@@ -26,6 +26,8 @@ class TransformResponse(BaseModel):
     latarm: str | None = None
     matched_subject: str | None = None
     source_detected: str
+    transform_ok: bool = True
+    required_keywords: list[str] = Field(default_factory=list)
     model: str
     retrieval_method: str | None = None
     candidates: list[RetrievedCandidate] = Field(default_factory=list)
