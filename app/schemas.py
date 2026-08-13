@@ -6,15 +6,10 @@ from pydantic import BaseModel, Field
 class SourceFormat(str, Enum):
     latarm = "latarm"
     eng = "eng"
-    auto = "auto"
 
 
 class TransformRequest(BaseModel):
     text: str = Field(..., min_length=1, description="Input text to transform")
-    source: SourceFormat = Field(
-        default=SourceFormat.auto,
-        description="Input format: latarm, eng, or auto-detect",
-    )
 
 
 class RetrievedCandidate(BaseModel):
@@ -31,6 +26,8 @@ class TransformResponse(BaseModel):
     latarm: str | None = None
     matched_subject: str | None = None
     source_detected: str
+    transform_ok: bool = True
+    required_keywords: list[str] = Field(default_factory=list)
     model: str
     retrieval_method: str | None = None
     candidates: list[RetrievedCandidate] = Field(default_factory=list)

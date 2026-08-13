@@ -9,8 +9,9 @@ Flow is always AI:
 
 1. Load templates from `data/SMS_Templates.xlsx` (sheet `New`)
 2. On `/transform`, retrieve top similar templates (embeddings + lexical)
-3. Send input + candidates to Llama
-4. Return `arm` / `eng` / `rus` (+ `latarm`)
+3. Auto-detect input source (`latarm` or `eng`)
+4. Send input + candidates to Llama
+5. Return `arm` / `eng` / `rus` (+ `latarm`)
 
 Updating templates = put new Excel + call `/admin/reindex` (no model fine-tune yet).
 
@@ -56,10 +57,14 @@ Example:
 
 ```json
 {
-  "text": "Anbavarar mijocner <amount> <currency> <card_mask>",
-  "source": "latarm"
+  "text": "Qarti hamalrum <amount> <currency> <card_mask> <sw_date> <sw_time>, TRN NU <utrnno>, Mnacord: <acct_bal> <acct_curr>"
 }
 ```
+
+Rules:
+- Placeholders / noise (`<amount>`, `TRN NU`, numbers, dates, currencies) are not transformed.
+- If not all template keywords are present in input → `transform_ok=false`, subject=`Amio card`, all language fields = original text.
+- `source` is detected automatically and returned as `source_detected`.
 
 ## Update templates
 
@@ -72,6 +77,7 @@ Example:
 ```text
 app/
   main.py              # API + startup reindex
+  source_detector.py   # auto-detect latarm vs eng
   ollama_client.py     # Llama chat with glossary-aware prompt
   schemas.py
   config.py
